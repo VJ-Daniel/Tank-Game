@@ -29,6 +29,31 @@
 #include "Game.h"
 
 #include <algorithm>
+#include <iostream>
+
+namespace
+{
+    const int ENEMY_COUNT_LEVEL1 = 4;
+    const int ENEMY_COUNT_LEVEL2 = 5;
+    const int ENEMY_COUNT_LEVEL3 = 6;
+
+    const glm::vec2 LEVEL2_ENEMY_SPAWNS[5] = {
+        { 1184.0f, 64.0f },
+        { 64.0f, 640.0f },
+        { 1184.0f, 640.0f },
+        { 640.0f, 352.0f },
+        { 640.0f, 640.0f }
+    };
+
+    const glm::vec2 LEVEL3_ENEMY_SPAWNS[6] = {
+        { 1184.0f, 64.0f },
+        { 640.0f, 64.0f },
+        { 64.0f, 640.0f },
+        { 1184.0f, 640.0f },
+        { 640.0f, 640.0f },
+        { 640.0f, 352.0f }
+    };
+}
 
 /*
     Constructor
@@ -55,6 +80,12 @@ Game::Game(
 
     screenHeight =
         height;
+    levelTransition = false;
+    levelTransitionTimer = 0.0f;
+    victoryDisplayed = false;
+    victoryTimer = 0.0f;
+    gameOverTimer = 0.0f; 
+    gameOverDisplayed = false;
 }
 
 //--------------------------------------------------
@@ -92,19 +123,147 @@ bool Game::Initialize(
     //--------------------------------------------------
     // Generate a procedural map.
     //--------------------------------------------------
-
-    // load level 1
-    //map.Generate();
-    //SpawnPlayer();
-    //SpawnEnemies();
-    
-    
-    // load level 2
-    //LoadLevel2();
-
-    // load level 3
-    LoadLevel3();
+    LoadLevel(1);
     return true;
+}
+
+void Game::LoadLevel(int level) {
+    bullets.clear();
+    enemies.clear();
+
+    levelTransition = false;
+    levelTransitionTimer = 0.0f;
+    victoryDisplayed = false;
+    victoryTimer = 0.0f;
+
+    switch (level)
+    {
+    case 1:
+        LoadLevel1();
+        break;
+    case 2:
+        LoadLevel2();
+        break;
+    case 3:
+        LoadLevel3();
+        break;
+    case 4:
+        LoadLevel4();
+        break;
+    default:
+        break;
+    }
+
+    levelManager.LoadLevel(level);
+}
+
+void Game::LoadLevel1() {
+    map.Generate();
+
+    renderer.SetLevel(1);
+
+    SpawnPlayer();
+
+    SpawnEnemiesLevel1();
+}
+
+void Game::LoadLevel2() {
+    map.Generate();
+
+    renderer.SetLevel(2);
+
+    int tileSize = map.GetTileSize();
+    int rows = map.GetRows();
+    int columns = map.GetColumns();
+
+    for (int i = 0; i < ENEMY_COUNT_LEVEL2; i++)
+    {
+        int centerCol = static_cast<int>(LEVEL2_ENEMY_SPAWNS[i].x) / tileSize;
+        int centerRow = static_cast<int>(LEVEL2_ENEMY_SPAWNS[i].y) / tileSize;
+
+        for (int row = centerRow - 2; row <= centerRow + 2; row++)
+        {
+            for (int col = centerCol - 2; col <= centerCol + 2; col++)
+            {
+                if (row < 0 || row >= rows || col < 0 || col >= columns)
+                    continue;
+
+                Tile& tile = map.GetTile(row, col);
+                tile.type = TileType::Empty;
+                tile.health = 0;
+            }
+        }
+    }
+    // Spawn player
+    SpawnPlayer();
+
+    // Spawn enemies
+    SpawnEnemiesLevel2();
+}
+
+void Game::LoadLevel3() {
+    map.Generate();
+
+    renderer.SetLevel(3);
+
+    // Increase density
+    int tileSize = map.GetTileSize();
+    int rows = map.GetRows();
+    int columns = map.GetColumns();
+
+    for (int row = 0; row < rows; row++)
+    {
+        for (int col = 0; col < columns; col++)
+        {
+            Tile& tile = map.GetTile(row, col);
+            if (tile.type != TileType::Empty)
+                continue;
+
+            int random = std::rand() % 100;
+            if (random < 15)
+            {
+                tile.type = TileType::Breakable;
+                tile.health = 1;
+            }
+            else if (random < 20)
+            {
+                tile.type = TileType::Steel;
+                tile.health = -1;
+            }
+        }
+    }
+
+    // Clear spawn zones
+    for (int s = -1; s < ENEMY_COUNT_LEVEL3; s++)
+    {
+        glm::vec2 spawn = (s < 0) ? map.GetPlayerSpawn() : LEVEL3_ENEMY_SPAWNS[s];
+
+        int centerCol = static_cast<int>(spawn.x) / tileSize;
+        int centerRow = static_cast<int>(spawn.y) / tileSize;
+
+        for (int row = centerRow - 2; row <= centerRow + 2; row++)
+        {
+            for (int col = centerCol - 2; col <= centerCol + 2; col++)
+            {
+                if (row < 0 || row >= rows || col < 0 || col >= columns)
+                    continue;
+
+                Tile& tile = map.GetTile(row, col);
+                tile.type = TileType::Empty;
+                tile.health = 0;
+            }
+        }
+    }
+
+    // Spawn player
+    SpawnPlayer();
+
+    // Spawn enemies
+    SpawnEnemiesLevel3();
+}
+
+void Game::LoadLevel4() {
+
 }
 
 //--------------------------------------------------
@@ -138,6 +297,7 @@ void Game::SpawnPlayer()
     player.SetSize(
         32.0f,
         32.0f);
+
 }
 
 //--------------------------------------------------
@@ -151,14 +311,12 @@ void Game::SpawnPlayer()
 //      4 Enemy Tanks
 //--------------------------------------------------
 
-void Game::SpawnEnemies()
+void Game::SpawnEnemiesLevel1()
 {
     enemies.clear();
 
-    const int ENEMY_COUNT = 4;
-
     for (int i = 0;
-        i < ENEMY_COUNT;
+        i < ENEMY_COUNT_LEVEL1;
         i++)
     {
         Enemy enemy;
@@ -177,6 +335,58 @@ void Game::SpawnEnemies()
         enemies.push_back(
             enemy);
     }
+}
+
+void Game::SpawnEnemiesLevel2()
+{
+    enemies.clear();
+
+    for (int i = 0;
+        i < ENEMY_COUNT_LEVEL2;
+        i++)
+    {
+        Enemy enemy;
+
+        enemy.SetPosition(LEVEL2_ENEMY_SPAWNS[i]);
+
+        enemy.SetMoveSpeed(
+            120.0f);
+
+        enemy.SetSize(
+            32.0f,
+            32.0f);
+
+        enemies.push_back(
+            enemy);
+    }
+}
+
+void Game::SpawnEnemiesLevel3()
+{
+    enemies.clear();
+
+    for (int i = 0;
+        i < ENEMY_COUNT_LEVEL3;
+        i++)
+    {
+        Enemy enemy;
+
+        enemy.SetPosition(LEVEL3_ENEMY_SPAWNS[i]);
+
+        enemy.SetMoveSpeed(
+            120.0f);
+
+        enemy.SetSize(
+            32.0f,
+            32.0f);
+
+        enemies.push_back(
+            enemy);
+    }
+}
+
+void Game::SpawnBoss() {
+
 }
 
 //--------------------------------------------------
@@ -384,7 +594,42 @@ void Game::HandlePlayerInput(
 
 void Game::Update(
     float deltaTime)
-{
+{   
+    if (levelManager.GetState() == GameState::GameOver)
+    {
+        gameOverTimer += deltaTime;
+        if (gameOverTimer > 3.0f) 
+        {
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+        }
+        return;
+    }
+
+    if (levelManager.GetState() == GameState::Victory)
+    {
+        victoryTimer += deltaTime;
+        if (victoryTimer > 5.0f) 
+        {
+            
+        }
+        return;
+    }
+
+    if (levelTransition)
+    {
+        levelTransitionTimer += deltaTime;
+        if (levelTransitionTimer > 2.0f) 
+        {
+            levelTransition = false;
+            int nextLevel = levelManager.GetCurrentLevel() + 1;
+            if (nextLevel <= 4)
+            {
+                LoadLevel(nextLevel);
+            }
+        }
+        return;
+    }
+
     UpdatePlayer(
         deltaTime);
 
@@ -397,6 +642,8 @@ void Game::Update(
     CheckCollisions();
 
     RemoveDestroyedObjects();
+
+    CheckLevelCompletion();
 }
 
 //--------------------------------------------------
@@ -792,6 +1039,9 @@ void Game::CheckCollisions()
                 player.Destroy();
 
                 bullet.Deactivate();
+                levelManager.SetState(GameState::GameOver);  
+                gameOverTimer = 0.0f; 
+                std::cout << "Player destroyed! Game Over!" << std::endl;
             }
         }
     }
@@ -846,6 +1096,36 @@ void Game::RemoveDestroyedObjects()
             }),
 
         enemies.end());
+}
+
+void Game::CheckLevelCompletion()
+{
+    int currentLevel = levelManager.GetCurrentLevel();
+
+    if (currentLevel < 4)
+    {
+        // Check if all enemies are destroyed
+        bool allEnemiesDestroyed = true;
+        for (const Enemy& enemy : enemies)
+        {
+            if (enemy.IsAlive())
+            {
+                allEnemiesDestroyed = false;
+                break;
+            }
+        }
+
+        if (allEnemiesDestroyed && !levelTransition)
+        {
+            levelTransition = true;
+            levelTransitionTimer = 0.0f;
+            std::cout << "Level " << currentLevel << " Complete! Loading next level..." << std::endl;
+        }
+    }
+    else if (currentLevel == 4)
+    {
+
+    }
 }
 
 //--------------------------------------------------
@@ -951,29 +1231,3 @@ void Game::Shutdown()
 //      Boss systems
 //--------------------------------------------------
 
-Tank& Game::GetPlayer()
-{
-    return player;
-}
-
-std::vector<Enemy>&
-Game::GetEnemies()
-{
-    return enemies;
-}
-
-std::vector<Bullet>&
-Game::GetBullets()
-{
-    return bullets;
-}
-
-Map& Game::GetMap()
-{
-    return map;
-}
-
-Renderer& Game::GetRenderer()
-{
-    return renderer;
-}

@@ -29,7 +29,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -143,11 +143,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\Boss.cpp" />
     <ClCompile Include="Src\Bullet.cpp" />
     <ClCompile Include="Src\Enemy.cpp" />
     <ClCompile Include="Src\Game.cpp" />
-    <ClCompile Include="Src\GameLevel2.cpp" />
-    <ClCompile Include="Src\GameLevel3.cpp" />
+    <ClCompile Include="src\LevelManager.cpp" />
     <ClCompile Include="Src\Main.cpp" />
     <ClCompile Include="Src\Map.cpp" />
     <ClCompile Include="Src\Mesh.cpp" />
@@ -156,9 +156,11 @@
     <ClCompile Include="Src\Tank.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\headers\Boss.h" />
     <ClInclude Include="Src\Headers\Bullet.h" />
     <ClInclude Include="Src\Headers\Enemy.h" />
     <ClInclude Include="Src\Headers\Game.h" />
+    <ClInclude Include="src\headers\LevelManager.h" />
     <ClInclude Include="Src\Headers\Map.h" />
     <ClInclude Include="Src\Headers\Mesh.h" />
     <ClInclude Include="Src\Headers\Renderer.h" />
