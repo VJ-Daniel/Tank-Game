@@ -66,7 +66,7 @@ enum class EnemyState
 
 class Enemy : public Tank
 {
-private:
+protected:
 
     //--------------------------------------------------
     // Target Tracking
