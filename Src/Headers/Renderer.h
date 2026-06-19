@@ -70,6 +70,7 @@
 #include "Enemy.h"
 #include "Bullet.h"
 #include "Map.h"
+#include "Boss.h"
 
 class Renderer
 {
@@ -144,6 +145,10 @@ private:
     Mesh* enemyBodyMesh;
 
     Mesh* enemyTurretMesh;
+
+    Mesh* bossBodyMesh;
+
+    Mesh* bossTurretMesh;
 
     //--------------------------------------------------
     // Bullet Mesh
@@ -321,6 +326,8 @@ public:
 
     void RenderEnemies(
         const std::vector<Enemy>& enemies);
+
+    void RenderBoss(const Boss& boss);
 
     void RenderBullets(
         const std::vector<Bullet>& bullets);
