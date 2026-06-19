@@ -262,8 +262,108 @@ void Game::LoadLevel3() {
     SpawnEnemiesLevel3();
 }
 
-void Game::LoadLevel4() {
+void Game::LoadLevel4()
+{
+    enemies.clear();
+    bullets.clear();
 
+    map.Generate();
+    renderer.SetLevel(4);
+
+    int rows = map.GetRows();    // 22
+    int columns = map.GetColumns(); // 40
+
+    // Step 1: Fill everything as empty first
+    for (int row = 0; row < rows; row++)
+    {
+        for (int col = 0; col < columns; col++)
+        {
+            Tile& tile = map.GetTile(row, col);
+            tile.type = TileType::Empty;
+            tile.health = 0;
+        }
+    }
+
+    // Step 2: Steel border walls
+    for (int row = 0; row < rows; row++)
+    {
+        for (int col = 0; col < columns; col++)
+        {
+            if (row == 0 || row == rows - 1 || col == 0 || col == columns - 1)
+            {
+                Tile& tile = map.GetTile(row, col);
+                tile.type = TileType::Steel;
+                tile.health = -1;
+            }
+        }
+    }
+
+    // Helper lambda: place a steel block rectangle
+    auto PlaceSteel = [&](int startRow, int startCol, int h, int w)
+        {
+            for (int r = startRow; r < startRow + h; r++)
+            {
+                for (int c = startCol; c < startCol + w; c++)
+                {
+                    if (r <= 0 || r >= rows - 1 || c <= 0 || c >= columns - 1)
+                        continue;
+                    Tile& tile = map.GetTile(r, c);
+                    tile.type = TileType::Steel;
+                    tile.health = -1;
+                }
+            }
+        };
+
+    // Step 3: Corner pillars (2x2 steel, inset from border)
+    // Top-left
+    PlaceSteel(2, 2, 2, 2);
+    // Top-right
+    PlaceSteel(2, columns - 4, 2, 2);
+    // Bottom-left
+    PlaceSteel(rows - 4, 2, 2, 2);
+    // Bottom-right
+    PlaceSteel(rows - 4, columns - 4, 2, 2);
+
+    // Step 4: Mid-field side barrier pairs (create lanes)
+    // Left-center pair
+    PlaceSteel(7, 4, 2, 3);
+    PlaceSteel(13, 4, 2, 3);
+    // Right-center pair
+    PlaceSteel(7, columns - 7, 2, 3);
+    PlaceSteel(13, columns - 7, 2, 3);
+
+    // Step 5: Inner pillars near center (force player to maneuver)
+    PlaceSteel(7, 14, 2, 3);
+    PlaceSteel(7, columns - 17, 2, 3);
+    PlaceSteel(13, 14, 2, 3);
+    PlaceSteel(13, columns - 17, 2, 3);
+
+    // Clear player spawn zone around (160, 580) → col 3-8, row 16-20
+    for (int r = 16; r <= 20; r++)
+    {
+        for (int c = 3; c <= 8; c++)
+        {
+            Tile& tile = map.GetTile(r, c);
+            tile.type = TileType::Empty;
+            tile.health = 0;
+        }
+    }4
+
+    // Step 7: Clear boss spawn zone (center-top, 7x5 tiles)
+    // Boss spawns at (640, 96) → tile col=20, row=3
+    for (int r = 1; r <= 5; r++)
+    {
+        for (int c = 17; c <= 23; c++)
+        {
+            Tile& tile = map.GetTile(r, c);
+            tile.type = TileType::Empty;
+            tile.health = 0;
+        }
+    }
+
+    // Spawn entities
+    SpawnPlayer();
+    SpawnBoss();
 }
 
 //--------------------------------------------------
@@ -282,8 +382,15 @@ void Game::LoadLevel4() {
 
 void Game::SpawnPlayer()
 {
-    player.SetPosition(
-        map.GetPlayerSpawn());
+    // Level 4 boss arena: spawn away from corner walls
+    if (levelManager.GetCurrentLevel() == 4)
+    {
+        player.SetPosition(glm::vec2(160.0f, 580.0f));
+    }
+    else
+    {
+        player.SetPosition(map.GetPlayerSpawn());
+    }
 
     player.SetRotation(
         0.0f);
@@ -385,8 +492,12 @@ void Game::SpawnEnemiesLevel3()
     }
 }
 
-void Game::SpawnBoss() {
-
+void Game::SpawnBoss()
+{
+    boss = Boss();
+    boss.SetPosition(glm::vec2(640.0f, 96.0f));  // center-top, clear zone
+    boss.SetRotation(3.14f);                       // faces downward toward player
+    boss.SetTargetPosition(player.GetPosition());
 }
 
 //--------------------------------------------------
@@ -430,6 +541,26 @@ void Game::HandlePlayerInput(
     if (!player.IsAlive())
     {
         return;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+    {
+        LoadLevel(1);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+    {
+        LoadLevel(2);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+    {
+        LoadLevel(3);
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS)
+    {
+        LoadLevel(4);
     }
 
     //--------------------------------------------------
@@ -636,6 +767,12 @@ void Game::Update(
     UpdateEnemies(
         deltaTime);
 
+    // ADD THIS:
+    if (levelManager.GetCurrentLevel() == 4)
+    {
+        UpdateBoss(deltaTime);
+    }
+
     UpdateBullets(
         deltaTime);
 
@@ -831,6 +968,38 @@ void Game::UpdateEnemies(
     }
 }
 
+void Game::UpdateBoss(float deltaTime)
+{
+    if (!boss.IsAlive())
+        return;
+
+    // Keep the boss tracking the player every frame
+    boss.SetTargetPosition(player.GetPosition());
+
+    glm::vec2 oldPosition = boss.GetPosition();
+
+    // Run boss AI (moves toward player, rotates, advances fireTimer)
+    boss.Update(deltaTime);
+
+    // Prevent boss from moving through walls
+    if (map.CheckTankCollision(boss.GetPosition(), boss.GetWidth(), boss.GetHeight()))
+    {
+        boss.SetPosition(oldPosition);
+    }
+
+    // Clamp to screen bounds (boss is 128px, so half = 64px)
+    glm::vec2 pos = boss.GetPosition();
+    pos.x = std::clamp(pos.x, 64.0f, static_cast<float>(screenWidth - 64));
+    pos.y = std::clamp(pos.y, 64.0f, static_cast<float>(screenHeight - 64));
+    boss.SetPosition(pos);
+
+    // Fire triple shot when in range
+    if (boss.CanSeeTarget() && boss.DistanceToTarget() <= boss.GetShootingRange())
+    {
+        boss.FireTripleShot(bullets);
+    }
+}
+
 //--------------------------------------------------
 // Bullet Update
 //
@@ -992,6 +1161,27 @@ void Game::CheckCollisions()
                     break;
                 }
             }
+
+            // ADD HERE — after the enemy loop, still inside IsFromPlayer()
+            if (bullet.IsActive() && levelManager.GetCurrentLevel() == 4 && boss.IsAlive())
+            {
+                glm::vec2 bulletMin = bullet.GetMinBounds();
+                glm::vec2 bulletMax = bullet.GetMaxBounds();
+                glm::vec2 bossMin = boss.GetMinBounds();
+                glm::vec2 bossMax = boss.GetMaxBounds();
+
+                bool overlap =
+                    bulletMin.x < bossMax.x &&
+                    bulletMax.x > bossMin.x &&
+                    bulletMin.y < bossMax.y &&
+                    bulletMax.y > bossMin.y;
+
+                if (overlap)
+                {
+                    boss.TakeDamage(1);
+                    bullet.Deactivate();
+                }
+            }
         }
 
         //--------------------------------------------------
@@ -1124,7 +1314,12 @@ void Game::CheckLevelCompletion()
     }
     else if (currentLevel == 4)
     {
-
+        if (boss.isDefeated())
+        {
+            levelManager.SetState(GameState::Victory);
+            victoryTimer = 0.0f;
+            std::cout << "Boss defeated! Victory!" << std::endl;
+        }
     }
 }
 
@@ -1183,6 +1378,11 @@ void Game::Render()
     //--------------------------------------------------
     // Finalize rendering operations.
     //--------------------------------------------------
+
+    if (levelManager.GetCurrentLevel() == 4 && boss.IsAlive())
+    {
+        renderer.RenderBoss(boss);
+    }
 
     renderer.EndFrame();
 }

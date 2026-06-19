@@ -274,6 +274,30 @@ bool Renderer::Initialize()
                 0.2f));
 
     //--------------------------------------------------
+    // Boss Tank Meshes
+    //--------------------------------------------------
+
+    bossBodyMesh =
+        new Mesh(
+            CreateRectangle(
+                32.0f,
+                32.0f,
+
+                0.25f,
+                0.0f,
+                0.45f));
+
+    bossTurretMesh =
+        new Mesh(
+            CreateRectangle(
+                36.0f,
+                10.0f,
+
+                1.0f,
+                0.85f,
+                0.1f));
+
+    //--------------------------------------------------
     // Bullet Mesh
     //--------------------------------------------------
 
@@ -464,8 +488,7 @@ void Renderer::BeginFrame()
         • Particle effects
 */
 void Renderer::EndFrame()
-{
-}
+{}
 
 /*
     Draws a mesh using the supplied model matrix.
@@ -528,6 +551,9 @@ void Renderer::DrawTank(
     float rotation =
         tank.GetRotation();
 
+    float scaleX = tank.GetWidth() / 32.0f;
+    float scaleY = tank.GetHeight() / 32.0f;
+
     //--------------------------------------------------
     // Tank Body
     //--------------------------------------------------
@@ -547,6 +573,14 @@ void Renderer::DrawTank(
             glm::vec3(
                 0.0f,
                 0.0f,
+                1.0f));
+
+    bodyModel =
+        glm::scale(
+            bodyModel,
+            glm::vec3(
+                tank.GetWidth() / 32.0f,
+                tank.GetHeight() / 32.0f,
                 1.0f));
 
     DrawMesh(
@@ -582,9 +616,17 @@ void Renderer::DrawTank(
         glm::translate(
             turretModel,
             glm::vec3(
-                12.0f,
+                tank.GetWidth() * 0.35f,
                 0.0f,
                 0.0f));
+
+    turretModel =
+        glm::scale(
+            turretModel,
+            glm::vec3(
+                tank.GetWidth() / 32.0f,
+                1.5f,
+                1.0f));
 
     DrawMesh(
         turretMesh,
@@ -727,6 +769,20 @@ void Renderer::RenderEnemies(
             enemyBodyMesh,
             enemyTurretMesh);
     }
+}
+
+void Renderer::RenderBoss(
+    const Boss& boss)
+{
+    if (!boss.IsAlive())
+    {
+        return;
+    }
+
+    DrawTank(
+        boss,
+        bossBodyMesh,
+        bossTurretMesh);
 }
 
 /*
