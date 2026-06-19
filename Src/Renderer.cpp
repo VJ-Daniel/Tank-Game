@@ -44,6 +44,7 @@
 #include "Renderer.h"
 
 #include <vector>
+#include <algorithm>
 
 #include <glm.hpp>
 #include <gtc/type_ptr.hpp>
@@ -90,6 +91,26 @@ namespace
             • Bullets
             • Map blocks
     */
+    // 5x7 pixel font — each row is a bitmask, bit4=col0 … bit0=col4
+    struct GlyphData { char ch; unsigned char rows[7]; };
+
+    const GlyphData FONT[] =
+    {
+        { 'G', { 14, 16, 16, 23, 17, 17, 14 } },
+        { 'A', { 14, 17, 17, 31, 17, 17, 17 } },
+        { 'M', { 17, 27, 21, 17, 17, 17, 17 } },
+        { 'E', { 31, 16, 16, 30, 16, 16, 31 } },
+        { 'O', { 14, 17, 17, 17, 17, 17, 14 } },
+        { 'V', { 17, 17, 17, 17, 17, 10,  4 } },
+        { 'R', { 30, 17, 17, 30, 20, 18, 17 } },
+        { 'I', { 31,  4,  4,  4,  4,  4, 31 } },
+        { 'C', { 14, 17, 16, 16, 16, 17, 14 } },
+        { 'T', { 31,  4,  4,  4,  4,  4,  4 } },
+        { 'Y', { 17, 17, 10,  4,  4,  4,  4 } },
+    };
+
+    const int FONT_COUNT = 11;
+
     std::vector<float> CreateRectangle(
         float width,
         float height,
@@ -175,6 +196,19 @@ Renderer::Renderer()
 
     brickMeshLevel3 = nullptr;
     steelMeshLevel3 = nullptr;
+
+    overlayMesh       = nullptr;
+    goPanelMesh       = nullptr;
+    victoryPanelMesh  = nullptr;
+    enemyIconMesh     = nullptr;
+    enemyIconDeadMesh = nullptr;
+    bossHpBorderMesh  = nullptr;
+    bossHpBgMesh      = nullptr;
+    bossHpFillMesh    = nullptr;
+    uiPixelRedMesh    = nullptr;
+    uiPixelGoldMesh   = nullptr;
+
+    alphaLocation = -1;
 
     //--------------------------------------------------
     // Active level.
@@ -404,6 +438,42 @@ bool Renderer::Initialize()
                 0.12f,
                 0.12f));
 
+    // Full-screen black overlay (drawn with uAlpha < 1 for transparency)
+    overlayMesh =
+        new Mesh(CreateRectangle(1280.0f, 720.0f, 0.0f, 0.0f, 0.0f));
+
+    // Game Over backing panel — wide enough for "GAME OVER" pixel text (320px) + padding
+    goPanelMesh =
+        new Mesh(CreateRectangle(360.0f, 70.0f, 0.20f, 0.0f, 0.0f));
+
+    // Victory backing panel — wide enough for "VICTORY" pixel text (262px) + padding
+    victoryPanelMesh =
+        new Mesh(CreateRectangle(300.0f, 70.0f, 0.20f, 0.16f, 0.0f));
+
+    // 6x6 pixel dots for the pixel-font letters
+    uiPixelRedMesh =
+        new Mesh(CreateRectangle(6.0f, 6.0f, 0.95f, 0.15f, 0.15f));
+
+    uiPixelGoldMesh =
+        new Mesh(CreateRectangle(6.0f, 6.0f, 0.95f, 0.82f, 0.05f));
+
+    // Enemy counter icons
+    enemyIconMesh =
+        new Mesh(CreateRectangle(16.0f, 16.0f, 0.9f, 0.15f, 0.15f));
+
+    enemyIconDeadMesh =
+        new Mesh(CreateRectangle(16.0f, 16.0f, 0.25f, 0.25f, 0.25f));
+
+    // Boss HP bar: border, background, fill
+    bossHpBorderMesh =
+        new Mesh(CreateRectangle(404.0f, 22.0f, 0.1f, 0.1f, 0.1f));
+
+    bossHpBgMesh =
+        new Mesh(CreateRectangle(400.0f, 18.0f, 0.35f, 0.35f, 0.35f));
+
+    bossHpFillMesh =
+        new Mesh(CreateRectangle(400.0f, 18.0f, 0.85f, 0.1f, 0.1f));
+
     return true;
 }
 
@@ -442,6 +512,14 @@ void Renderer::SetShader(
                 glGetUniformLocation(
                     shader->GetID(),
                     "mvp"));
+
+        alphaLocation =
+            static_cast<int>(
+                glGetUniformLocation(
+                    shader->GetID(),
+                    "uAlpha"));
+
+        glUniform1f(alphaLocation, 1.0f);
     }
 }
 
@@ -473,6 +551,7 @@ void Renderer::BeginFrame()
     if (shader)
     {
         shader->Use();
+        glUniform1f(alphaLocation, 1.0f);
     }
 }
 
@@ -864,6 +943,17 @@ void Renderer::Shutdown()
 
     delete steelMeshLevel3;
     steelMeshLevel3 = nullptr;
+
+    delete overlayMesh;       overlayMesh       = nullptr;
+    delete goPanelMesh;       goPanelMesh       = nullptr;
+    delete victoryPanelMesh;  victoryPanelMesh  = nullptr;
+    delete enemyIconMesh;     enemyIconMesh     = nullptr;
+    delete enemyIconDeadMesh; enemyIconDeadMesh = nullptr;
+    delete bossHpBorderMesh;  bossHpBorderMesh  = nullptr;
+    delete bossHpBgMesh;      bossHpBgMesh      = nullptr;
+    delete bossHpFillMesh;    bossHpFillMesh    = nullptr;
+    delete uiPixelRedMesh;    uiPixelRedMesh    = nullptr;
+    delete uiPixelGoldMesh;   uiPixelGoldMesh   = nullptr;
 }
 
 /*
@@ -875,4 +965,139 @@ void Renderer::Shutdown()
 Renderer::~Renderer()
 {
     Shutdown();
+}
+
+void Renderer::SetAlpha(float alpha)
+{
+    if (alphaLocation != -1)
+        glUniform1f(alphaLocation, alpha);
+}
+
+void Renderer::RenderEnemyCounter(int remaining, int total)
+{
+    if (total <= 0)
+        return;
+
+    const float iconSize = 16.0f;
+    const float gap      = 4.0f;
+    const float startX   = 20.0f + iconSize * 0.5f;
+    const float y        = 702.0f;
+
+    for (int i = 0; i < total; i++)
+    {
+        float cx = startX + i * (iconSize + gap);
+        glm::mat4 model =
+            glm::translate(glm::mat4(1.0f), glm::vec3(cx, y, 0.0f));
+
+        DrawMesh(i < remaining ? enemyIconMesh : enemyIconDeadMesh, model);
+    }
+}
+
+void Renderer::RenderBossHealthBar(int hp, int maxHp)
+{
+    if (maxHp <= 0)
+        return;
+
+    float ratio = std::clamp((float)hp / (float)maxHp, 0.0f, 1.0f);
+    const float barY = 702.0f;
+    const float barHalfW = 200.0f; // half of 400px bar
+
+    glm::mat4 borderModel =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, barY, 0.0f));
+    DrawMesh(bossHpBorderMesh, borderModel);
+
+    glm::mat4 bgModel =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, barY, 0.0f));
+    DrawMesh(bossHpBgMesh, bgModel);
+
+    if (ratio > 0.0f)
+    {
+        float fillCenterX = (640.0f - barHalfW) + ratio * barHalfW;
+        glm::mat4 fillModel =
+            glm::translate(glm::mat4(1.0f), glm::vec3(fillCenterX, barY, 0.0f));
+        fillModel = glm::scale(fillModel, glm::vec3(ratio, 1.0f, 1.0f));
+        DrawMesh(bossHpFillMesh, fillModel);
+    }
+}
+
+void Renderer::RenderGameOver()
+{
+    SetAlpha(0.75f);
+    DrawMesh(overlayMesh, glm::mat4(1.0f));
+    SetAlpha(1.0f);
+
+    glm::mat4 center =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, 360.0f, 0.0f));
+    DrawMesh(goPanelMesh, center);
+
+    DrawPixelText("GAME OVER", 640.0f, 360.0f, uiPixelRedMesh);
+}
+
+void Renderer::RenderVictory()
+{
+    SetAlpha(0.75f);
+    DrawMesh(overlayMesh, glm::mat4(1.0f));
+    SetAlpha(1.0f);
+
+    glm::mat4 center =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, 360.0f, 0.0f));
+    DrawMesh(victoryPanelMesh, center);
+
+    DrawPixelText("VICTORY", 640.0f, 360.0f, uiPixelGoldMesh);
+}
+
+void Renderer::DrawPixelChar(char c, float left, float top, Mesh* pixelMesh)
+{
+    const float ps     = 6.0f;
+    const float stride = ps + 1.0f;  // 7px between pixel centers
+
+    const GlyphData* glyph = nullptr;
+    for (int i = 0; i < FONT_COUNT; i++)
+    {
+        if (FONT[i].ch == c) { glyph = &FONT[i]; break; }
+    }
+    if (!glyph) return;
+
+    for (int row = 0; row < 7; row++)
+    {
+        for (int col = 0; col < 5; col++)
+        {
+            if ((glyph->rows[row] >> (4 - col)) & 1)
+            {
+                float px = left + col * stride + ps * 0.5f;
+                float py = top  - row * stride - ps * 0.5f;
+                glm::mat4 model =
+                    glm::translate(glm::mat4(1.0f), glm::vec3(px, py, 0.0f));
+                DrawMesh(pixelMesh, model);
+            }
+        }
+    }
+}
+
+void Renderer::DrawPixelText(const char* text, float cx, float cy, Mesh* pixelMesh)
+{
+    const float ps         = 6.0f;
+    const float stride     = ps + 1.0f;
+    const float charWidth  = 5.0f * stride - 1.0f;  // 34px
+    const float charHeight = 7.0f * stride - 1.0f;  // 48px
+    const float charGap    = 4.0f;
+    const float spaceWidth = 16.0f;
+
+    float totalWidth = 0.0f;
+    for (int i = 0; text[i] != '\0'; i++)
+    {
+        if (i > 0) totalWidth += charGap;
+        totalWidth += (text[i] == ' ') ? spaceWidth : charWidth;
+    }
+
+    float curX = cx - totalWidth * 0.5f;
+    float topY = cy + charHeight * 0.5f;
+
+    for (int i = 0; text[i] != '\0'; i++)
+    {
+        if (i > 0) curX += charGap;
+        if (text[i] != ' ')
+            DrawPixelChar(text[i], curX, topY, pixelMesh);
+        curX += (text[i] == ' ') ? spaceWidth : charWidth;
+    }
 }

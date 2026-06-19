@@ -179,6 +179,20 @@ private:
     Mesh* steelMeshLevel3;
     int   currentLevel;
 
+    // UI meshes
+    Mesh* overlayMesh;
+    Mesh* goPanelMesh;
+    Mesh* victoryPanelMesh;
+    Mesh* enemyIconMesh;
+    Mesh* enemyIconDeadMesh;
+    Mesh* bossHpBorderMesh;
+    Mesh* bossHpBgMesh;
+    Mesh* bossHpFillMesh;
+    Mesh* uiPixelRedMesh;
+    Mesh* uiPixelGoldMesh;
+
+    int alphaLocation;
+
 private:
 
     //--------------------------------------------------
@@ -241,6 +255,10 @@ private:
     */
     void DrawTile(
         const Tile& tile);
+
+    void SetAlpha(float alpha);
+    void DrawPixelChar(char c, float left, float top, Mesh* pixelMesh);
+    void DrawPixelText(const char* text, float cx, float cy, Mesh* pixelMesh);
 
 public:
 
@@ -334,6 +352,11 @@ public:
 
     void RenderMap(
         const Map& map);
+
+    void RenderEnemyCounter(int remaining, int total);
+    void RenderBossHealthBar(int hp, int maxHp);
+    void RenderGameOver();
+    void RenderVictory();
 
     //--------------------------------------------------
     // Resource Cleanup

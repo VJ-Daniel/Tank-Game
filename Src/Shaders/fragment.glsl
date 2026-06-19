@@ -69,31 +69,11 @@
 
 in vec3 vertexColor;
 
-//--------------------------------------------------
-// Final Output Color
-//
-// Written to the framebuffer.
-//--------------------------------------------------
-
 out vec4 FragColor;
 
-//--------------------------------------------------
-// Main
-//
-// Executes once for every generated fragment
-// (potential pixel).
-//--------------------------------------------------
+uniform float uAlpha;
 
 void main()
 {
-    //--------------------------------------------------
-    // Output the interpolated RGB color.
-    //
-    // Alpha is fixed at 1.0 (fully opaque).
-    //--------------------------------------------------
-
-    FragColor =
-        vec4(
-            vertexColor,
-            1.0);
+    FragColor = vec4(vertexColor, uAlpha);
 }
