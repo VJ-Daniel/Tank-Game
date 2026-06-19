@@ -182,14 +182,14 @@ private:
     // UI meshes
     Mesh* overlayMesh;
     Mesh* goPanelMesh;
-    Mesh* goBarMesh;
     Mesh* victoryPanelMesh;
-    Mesh* victoryDiamondMesh;
     Mesh* enemyIconMesh;
     Mesh* enemyIconDeadMesh;
     Mesh* bossHpBorderMesh;
     Mesh* bossHpBgMesh;
     Mesh* bossHpFillMesh;
+    Mesh* uiPixelRedMesh;
+    Mesh* uiPixelGoldMesh;
 
     int alphaLocation;
 
@@ -257,6 +257,8 @@ private:
         const Tile& tile);
 
     void SetAlpha(float alpha);
+    void DrawPixelChar(char c, float left, float top, Mesh* pixelMesh);
+    void DrawPixelText(const char* text, float cx, float cy, Mesh* pixelMesh);
 
 public:
 

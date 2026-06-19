@@ -91,6 +91,26 @@ namespace
             • Bullets
             • Map blocks
     */
+    // 5x7 pixel font — each row is a bitmask, bit4=col0 … bit0=col4
+    struct GlyphData { char ch; unsigned char rows[7]; };
+
+    const GlyphData FONT[] =
+    {
+        { 'G', { 14, 16, 16, 23, 17, 17, 14 } },
+        { 'A', { 14, 17, 17, 31, 17, 17, 17 } },
+        { 'M', { 17, 27, 21, 17, 17, 17, 17 } },
+        { 'E', { 31, 16, 16, 30, 16, 16, 31 } },
+        { 'O', { 14, 17, 17, 17, 17, 17, 14 } },
+        { 'V', { 17, 17, 17, 17, 17, 10,  4 } },
+        { 'R', { 30, 17, 17, 30, 20, 18, 17 } },
+        { 'I', { 31,  4,  4,  4,  4,  4, 31 } },
+        { 'C', { 14, 17, 16, 16, 16, 17, 14 } },
+        { 'T', { 31,  4,  4,  4,  4,  4,  4 } },
+        { 'Y', { 17, 17, 10,  4,  4,  4,  4 } },
+    };
+
+    const int FONT_COUNT = 11;
+
     std::vector<float> CreateRectangle(
         float width,
         float height,
@@ -177,16 +197,16 @@ Renderer::Renderer()
     brickMeshLevel3 = nullptr;
     steelMeshLevel3 = nullptr;
 
-    overlayMesh         = nullptr;
-    goPanelMesh         = nullptr;
-    goBarMesh           = nullptr;
-    victoryPanelMesh    = nullptr;
-    victoryDiamondMesh  = nullptr;
-    enemyIconMesh       = nullptr;
-    enemyIconDeadMesh   = nullptr;
-    bossHpBorderMesh    = nullptr;
-    bossHpBgMesh        = nullptr;
-    bossHpFillMesh      = nullptr;
+    overlayMesh       = nullptr;
+    goPanelMesh       = nullptr;
+    victoryPanelMesh  = nullptr;
+    enemyIconMesh     = nullptr;
+    enemyIconDeadMesh = nullptr;
+    bossHpBorderMesh  = nullptr;
+    bossHpBgMesh      = nullptr;
+    bossHpFillMesh    = nullptr;
+    uiPixelRedMesh    = nullptr;
+    uiPixelGoldMesh   = nullptr;
 
     alphaLocation = -1;
 
@@ -422,19 +442,20 @@ bool Renderer::Initialize()
     overlayMesh =
         new Mesh(CreateRectangle(1280.0f, 720.0f, 0.0f, 0.0f, 0.0f));
 
-    // Game Over: dark red backing panel + red X bars
+    // Game Over backing panel — wide enough for "GAME OVER" pixel text (320px) + padding
     goPanelMesh =
-        new Mesh(CreateRectangle(300.0f, 160.0f, 0.25f, 0.0f, 0.0f));
+        new Mesh(CreateRectangle(360.0f, 70.0f, 0.20f, 0.0f, 0.0f));
 
-    goBarMesh =
-        new Mesh(CreateRectangle(180.0f, 22.0f, 0.9f, 0.1f, 0.1f));
-
-    // Victory: dark gold backing panel + gold diamond
+    // Victory backing panel — wide enough for "VICTORY" pixel text (262px) + padding
     victoryPanelMesh =
-        new Mesh(CreateRectangle(300.0f, 160.0f, 0.22f, 0.18f, 0.0f));
+        new Mesh(CreateRectangle(300.0f, 70.0f, 0.20f, 0.16f, 0.0f));
 
-    victoryDiamondMesh =
-        new Mesh(CreateRectangle(80.0f, 80.0f, 0.95f, 0.82f, 0.05f));
+    // 6x6 pixel dots for the pixel-font letters
+    uiPixelRedMesh =
+        new Mesh(CreateRectangle(6.0f, 6.0f, 0.95f, 0.15f, 0.15f));
+
+    uiPixelGoldMesh =
+        new Mesh(CreateRectangle(6.0f, 6.0f, 0.95f, 0.82f, 0.05f));
 
     // Enemy counter icons
     enemyIconMesh =
@@ -923,16 +944,16 @@ void Renderer::Shutdown()
     delete steelMeshLevel3;
     steelMeshLevel3 = nullptr;
 
-    delete overlayMesh;         overlayMesh         = nullptr;
-    delete goPanelMesh;         goPanelMesh         = nullptr;
-    delete goBarMesh;           goBarMesh           = nullptr;
-    delete victoryPanelMesh;    victoryPanelMesh    = nullptr;
-    delete victoryDiamondMesh;  victoryDiamondMesh  = nullptr;
-    delete enemyIconMesh;       enemyIconMesh       = nullptr;
-    delete enemyIconDeadMesh;   enemyIconDeadMesh   = nullptr;
-    delete bossHpBorderMesh;    bossHpBorderMesh    = nullptr;
-    delete bossHpBgMesh;        bossHpBgMesh        = nullptr;
-    delete bossHpFillMesh;      bossHpFillMesh      = nullptr;
+    delete overlayMesh;       overlayMesh       = nullptr;
+    delete goPanelMesh;       goPanelMesh       = nullptr;
+    delete victoryPanelMesh;  victoryPanelMesh  = nullptr;
+    delete enemyIconMesh;     enemyIconMesh     = nullptr;
+    delete enemyIconDeadMesh; enemyIconDeadMesh = nullptr;
+    delete bossHpBorderMesh;  bossHpBorderMesh  = nullptr;
+    delete bossHpBgMesh;      bossHpBgMesh      = nullptr;
+    delete bossHpFillMesh;    bossHpFillMesh    = nullptr;
+    delete uiPixelRedMesh;    uiPixelRedMesh    = nullptr;
+    delete uiPixelGoldMesh;   uiPixelGoldMesh   = nullptr;
 }
 
 /*
@@ -1001,38 +1022,82 @@ void Renderer::RenderBossHealthBar(int hp, int maxHp)
 
 void Renderer::RenderGameOver()
 {
-    // Semi-transparent overlay
     SetAlpha(0.75f);
     DrawMesh(overlayMesh, glm::mat4(1.0f));
     SetAlpha(1.0f);
 
     glm::mat4 center =
         glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, 360.0f, 0.0f));
-
-    // Dark red backing panel
     DrawMesh(goPanelMesh, center);
 
-    // Red X: two bars rotated ±45°
-    glm::mat4 bar1 = glm::rotate(center, glm::radians(45.0f),  glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 bar2 = glm::rotate(center, glm::radians(-45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    DrawMesh(goBarMesh, bar1);
-    DrawMesh(goBarMesh, bar2);
+    DrawPixelText("GAME OVER", 640.0f, 360.0f, uiPixelRedMesh);
 }
 
 void Renderer::RenderVictory()
 {
-    // Semi-transparent overlay
     SetAlpha(0.75f);
     DrawMesh(overlayMesh, glm::mat4(1.0f));
     SetAlpha(1.0f);
 
     glm::mat4 center =
         glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, 360.0f, 0.0f));
-
-    // Dark gold backing panel
     DrawMesh(victoryPanelMesh, center);
 
-    // Gold diamond (square rotated 45°)
-    glm::mat4 diamond = glm::rotate(center, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    DrawMesh(victoryDiamondMesh, diamond);
+    DrawPixelText("VICTORY", 640.0f, 360.0f, uiPixelGoldMesh);
+}
+
+void Renderer::DrawPixelChar(char c, float left, float top, Mesh* pixelMesh)
+{
+    const float ps     = 6.0f;
+    const float stride = ps + 1.0f;  // 7px between pixel centers
+
+    const GlyphData* glyph = nullptr;
+    for (int i = 0; i < FONT_COUNT; i++)
+    {
+        if (FONT[i].ch == c) { glyph = &FONT[i]; break; }
+    }
+    if (!glyph) return;
+
+    for (int row = 0; row < 7; row++)
+    {
+        for (int col = 0; col < 5; col++)
+        {
+            if ((glyph->rows[row] >> (4 - col)) & 1)
+            {
+                float px = left + col * stride + ps * 0.5f;
+                float py = top  - row * stride - ps * 0.5f;
+                glm::mat4 model =
+                    glm::translate(glm::mat4(1.0f), glm::vec3(px, py, 0.0f));
+                DrawMesh(pixelMesh, model);
+            }
+        }
+    }
+}
+
+void Renderer::DrawPixelText(const char* text, float cx, float cy, Mesh* pixelMesh)
+{
+    const float ps         = 6.0f;
+    const float stride     = ps + 1.0f;
+    const float charWidth  = 5.0f * stride - 1.0f;  // 34px
+    const float charHeight = 7.0f * stride - 1.0f;  // 48px
+    const float charGap    = 4.0f;
+    const float spaceWidth = 16.0f;
+
+    float totalWidth = 0.0f;
+    for (int i = 0; text[i] != '\0'; i++)
+    {
+        if (i > 0) totalWidth += charGap;
+        totalWidth += (text[i] == ' ') ? spaceWidth : charWidth;
+    }
+
+    float curX = cx - totalWidth * 0.5f;
+    float topY = cy + charHeight * 0.5f;
+
+    for (int i = 0; text[i] != '\0'; i++)
+    {
+        if (i > 0) curX += charGap;
+        if (text[i] != ' ')
+            DrawPixelChar(text[i], curX, topY, pixelMesh);
+        curX += (text[i] == ' ') ? spaceWidth : charWidth;
+    }
 }
