@@ -347,7 +347,7 @@ void Game::LoadLevel4()
             tile.type = TileType::Empty;
             tile.health = 0;
         }
-    }4
+    }
 
     // Step 7: Clear boss spawn zone (center-top, 7x5 tiles)
     // Boss spawns at (640, 96) → tile col=20, row=3
