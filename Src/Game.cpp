@@ -1384,6 +1384,25 @@ void Game::Render()
         renderer.RenderBoss(boss);
     }
 
+    // HUD
+    int currentLevel = levelManager.GetCurrentLevel();
+    if (currentLevel < 4)
+    {
+        int total = levelManager.GetEnemyCountForLevel(currentLevel);
+        renderer.RenderEnemyCounter(static_cast<int>(enemies.size()), total);
+    }
+    else if (currentLevel == 4)
+    {
+        renderer.RenderBossHealthBar(boss.GetHP(), boss.GetMaxHP());
+    }
+
+    // Screens (drawn on top of everything)
+    GameState state = levelManager.GetState();
+    if (state == GameState::GameOver)
+        renderer.RenderGameOver();
+    else if (state == GameState::Victory)
+        renderer.RenderVictory();
+
     renderer.EndFrame();
 }
 

@@ -44,6 +44,7 @@
 #include "Renderer.h"
 
 #include <vector>
+#include <algorithm>
 
 #include <glm.hpp>
 #include <gtc/type_ptr.hpp>
@@ -175,6 +176,19 @@ Renderer::Renderer()
 
     brickMeshLevel3 = nullptr;
     steelMeshLevel3 = nullptr;
+
+    overlayMesh         = nullptr;
+    goPanelMesh         = nullptr;
+    goBarMesh           = nullptr;
+    victoryPanelMesh    = nullptr;
+    victoryDiamondMesh  = nullptr;
+    enemyIconMesh       = nullptr;
+    enemyIconDeadMesh   = nullptr;
+    bossHpBorderMesh    = nullptr;
+    bossHpBgMesh        = nullptr;
+    bossHpFillMesh      = nullptr;
+
+    alphaLocation = -1;
 
     //--------------------------------------------------
     // Active level.
@@ -404,6 +418,41 @@ bool Renderer::Initialize()
                 0.12f,
                 0.12f));
 
+    // Full-screen black overlay (drawn with uAlpha < 1 for transparency)
+    overlayMesh =
+        new Mesh(CreateRectangle(1280.0f, 720.0f, 0.0f, 0.0f, 0.0f));
+
+    // Game Over: dark red backing panel + red X bars
+    goPanelMesh =
+        new Mesh(CreateRectangle(300.0f, 160.0f, 0.25f, 0.0f, 0.0f));
+
+    goBarMesh =
+        new Mesh(CreateRectangle(180.0f, 22.0f, 0.9f, 0.1f, 0.1f));
+
+    // Victory: dark gold backing panel + gold diamond
+    victoryPanelMesh =
+        new Mesh(CreateRectangle(300.0f, 160.0f, 0.22f, 0.18f, 0.0f));
+
+    victoryDiamondMesh =
+        new Mesh(CreateRectangle(80.0f, 80.0f, 0.95f, 0.82f, 0.05f));
+
+    // Enemy counter icons
+    enemyIconMesh =
+        new Mesh(CreateRectangle(16.0f, 16.0f, 0.9f, 0.15f, 0.15f));
+
+    enemyIconDeadMesh =
+        new Mesh(CreateRectangle(16.0f, 16.0f, 0.25f, 0.25f, 0.25f));
+
+    // Boss HP bar: border, background, fill
+    bossHpBorderMesh =
+        new Mesh(CreateRectangle(404.0f, 22.0f, 0.1f, 0.1f, 0.1f));
+
+    bossHpBgMesh =
+        new Mesh(CreateRectangle(400.0f, 18.0f, 0.35f, 0.35f, 0.35f));
+
+    bossHpFillMesh =
+        new Mesh(CreateRectangle(400.0f, 18.0f, 0.85f, 0.1f, 0.1f));
+
     return true;
 }
 
@@ -442,6 +491,14 @@ void Renderer::SetShader(
                 glGetUniformLocation(
                     shader->GetID(),
                     "mvp"));
+
+        alphaLocation =
+            static_cast<int>(
+                glGetUniformLocation(
+                    shader->GetID(),
+                    "uAlpha"));
+
+        glUniform1f(alphaLocation, 1.0f);
     }
 }
 
@@ -473,6 +530,7 @@ void Renderer::BeginFrame()
     if (shader)
     {
         shader->Use();
+        glUniform1f(alphaLocation, 1.0f);
     }
 }
 
@@ -864,6 +922,17 @@ void Renderer::Shutdown()
 
     delete steelMeshLevel3;
     steelMeshLevel3 = nullptr;
+
+    delete overlayMesh;         overlayMesh         = nullptr;
+    delete goPanelMesh;         goPanelMesh         = nullptr;
+    delete goBarMesh;           goBarMesh           = nullptr;
+    delete victoryPanelMesh;    victoryPanelMesh    = nullptr;
+    delete victoryDiamondMesh;  victoryDiamondMesh  = nullptr;
+    delete enemyIconMesh;       enemyIconMesh       = nullptr;
+    delete enemyIconDeadMesh;   enemyIconDeadMesh   = nullptr;
+    delete bossHpBorderMesh;    bossHpBorderMesh    = nullptr;
+    delete bossHpBgMesh;        bossHpBgMesh        = nullptr;
+    delete bossHpFillMesh;      bossHpFillMesh      = nullptr;
 }
 
 /*
@@ -875,4 +944,95 @@ void Renderer::Shutdown()
 Renderer::~Renderer()
 {
     Shutdown();
+}
+
+void Renderer::SetAlpha(float alpha)
+{
+    if (alphaLocation != -1)
+        glUniform1f(alphaLocation, alpha);
+}
+
+void Renderer::RenderEnemyCounter(int remaining, int total)
+{
+    if (total <= 0)
+        return;
+
+    const float iconSize = 16.0f;
+    const float gap      = 4.0f;
+    const float startX   = 20.0f + iconSize * 0.5f;
+    const float y        = 702.0f;
+
+    for (int i = 0; i < total; i++)
+    {
+        float cx = startX + i * (iconSize + gap);
+        glm::mat4 model =
+            glm::translate(glm::mat4(1.0f), glm::vec3(cx, y, 0.0f));
+
+        DrawMesh(i < remaining ? enemyIconMesh : enemyIconDeadMesh, model);
+    }
+}
+
+void Renderer::RenderBossHealthBar(int hp, int maxHp)
+{
+    if (maxHp <= 0)
+        return;
+
+    float ratio = std::clamp((float)hp / (float)maxHp, 0.0f, 1.0f);
+    const float barY = 702.0f;
+    const float barHalfW = 200.0f; // half of 400px bar
+
+    glm::mat4 borderModel =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, barY, 0.0f));
+    DrawMesh(bossHpBorderMesh, borderModel);
+
+    glm::mat4 bgModel =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, barY, 0.0f));
+    DrawMesh(bossHpBgMesh, bgModel);
+
+    if (ratio > 0.0f)
+    {
+        float fillCenterX = (640.0f - barHalfW) + ratio * barHalfW;
+        glm::mat4 fillModel =
+            glm::translate(glm::mat4(1.0f), glm::vec3(fillCenterX, barY, 0.0f));
+        fillModel = glm::scale(fillModel, glm::vec3(ratio, 1.0f, 1.0f));
+        DrawMesh(bossHpFillMesh, fillModel);
+    }
+}
+
+void Renderer::RenderGameOver()
+{
+    // Semi-transparent overlay
+    SetAlpha(0.75f);
+    DrawMesh(overlayMesh, glm::mat4(1.0f));
+    SetAlpha(1.0f);
+
+    glm::mat4 center =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, 360.0f, 0.0f));
+
+    // Dark red backing panel
+    DrawMesh(goPanelMesh, center);
+
+    // Red X: two bars rotated ±45°
+    glm::mat4 bar1 = glm::rotate(center, glm::radians(45.0f),  glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 bar2 = glm::rotate(center, glm::radians(-45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    DrawMesh(goBarMesh, bar1);
+    DrawMesh(goBarMesh, bar2);
+}
+
+void Renderer::RenderVictory()
+{
+    // Semi-transparent overlay
+    SetAlpha(0.75f);
+    DrawMesh(overlayMesh, glm::mat4(1.0f));
+    SetAlpha(1.0f);
+
+    glm::mat4 center =
+        glm::translate(glm::mat4(1.0f), glm::vec3(640.0f, 360.0f, 0.0f));
+
+    // Dark gold backing panel
+    DrawMesh(victoryPanelMesh, center);
+
+    // Gold diamond (square rotated 45°)
+    glm::mat4 diamond = glm::rotate(center, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    DrawMesh(victoryDiamondMesh, diamond);
 }
