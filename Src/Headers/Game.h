@@ -52,6 +52,8 @@
 #include "Bullet.h"
 #include "Map.h"
 #include "Renderer.h"
+#include "LevelManager.h" 
+#include "Boss.h"
 
 class Game
 {
@@ -91,6 +93,8 @@ private:
 
     Map map;
 
+    LevelManager levelManager;
+
     //--------------------------------------------------
     // Game Entities
     //
@@ -111,6 +115,19 @@ private:
 
     std::vector<Bullet> bullets;
 
+    Boss boss;
+
+    //--------------------------------------------------
+    // Level State
+    //--------------------------------------------------
+
+    bool levelTransition;    
+    float levelTransitionTimer;
+    bool victoryDisplayed;
+    float victoryTimer;
+    bool gameOverDisplayed;
+    float gameOverTimer;
+
     //--------------------------------------------------
     // Internal Helper Functions
     //
@@ -130,17 +147,13 @@ private:
     void SpawnPlayer();
 
     /*
-        Creates and configures enemy tanks.
-
-        Responsibilities:
-
-            • Set spawn positions
-            • Configure AI properties
-            • Configure dimensions
+        Creates and configures enemy tanks for each level.
     */
-    void SpawnEnemies();
+    void SpawnEnemiesLevel1();
     void SpawnEnemiesLevel2();
     void SpawnEnemiesLevel3();
+    void SpawnBoss();
+
     /*
         Processes player keyboard input.
 
@@ -150,8 +163,7 @@ private:
             • Rotation
             • Shooting
     */
-    void HandlePlayerInput(
-        float deltaTime);
+    void HandlePlayerInput(float deltaTime);
 
     /*
         Updates player state.
@@ -162,52 +174,30 @@ private:
             • Boundary checks
             • Gameplay state updates
     */
-    void UpdatePlayer(
-        float deltaTime);
+    void UpdatePlayer(float deltaTime);
 
     /*
         Updates all enemy tanks.
-
-        Responsibilities:
-
-            • AI state transitions
-            • Patrol behavior
-            • Chase behavior
-            • Shooting behavior
     */
-    void UpdateEnemies(
-        float deltaTime);
+    void UpdateEnemies(float deltaTime);
+
+    /*
+        Updates the boss (Level 4).
+    */
+    void UpdateBoss(float deltaTime);
 
     /*
         Updates all active projectiles.
-
-        Responsibilities:
-
-            • Movement
-            • Collision tests
-            • Screen boundary checks
     */
-    void UpdateBullets(
-        float deltaTime);
+    void UpdateBullets(float deltaTime);
 
     /*
         Performs collision detection.
-
-        Checks:
-
-            • Bullet vs Enemy
-            • Bullet vs Player
-            • Bullet vs Map
     */
     void CheckCollisions();
 
     /*
         Removes inactive gameplay objects.
-
-        Objects Removed:
-
-            • Destroyed bullets
-            • Destroyed enemies
     */
     void RemoveDestroyedObjects();
 
@@ -215,108 +205,49 @@ public:
 
     //--------------------------------------------------
     // Constructor
-    //
-    // Creates the game controller.
-    //
-    // Parameters:
-    //
-    //      window
-    //          GLFW window reference
-    //
-    //      width
-    //          Screen width
-    //
-    //      height
-    //          Screen height
     //--------------------------------------------------
 
-    Game(
-        GLFWwindow* window,
-        int width,
-        int height);
+    Game(GLFWwindow* window, int width, int height);
 
     //--------------------------------------------------
     // Initialization
-    //
-    // Initializes all major game systems.
-    //
-    // Responsibilities:
-    //
-    //      • Renderer setup
-    //      • Map generation
-    //      • Player creation
-    //      • Enemy creation
-    //
-    // Returns:
-    //
-    //      true
-    //          Initialization succeeded
-    //
-    //      false
-    //          Initialization failed
     //--------------------------------------------------
 
-    bool Initialize(
-        Shader* shader);
+    bool Initialize(Shader* shader);
 
     //--------------------------------------------------
     // Main Game Loop Functions
-    //
-    // ProcessInput()
-    //      Reads keyboard input.
-    //
-    // Update()
-    //      Executes gameplay logic.
-    //
-    // Render()
-    //      Draws the current frame.
     //--------------------------------------------------
 
-    void ProcessInput(
-        float deltaTime);
-
-    void Update(
-        float deltaTime);
-
+    void ProcessInput(float deltaTime);
+    void Update(float deltaTime);
     void Render();
 
     //--------------------------------------------------
+    // Level Management
+    //--------------------------------------------------
+
+    void LoadLevel(int level);
+    void LoadLevel1();
+    void LoadLevel2();
+    void LoadLevel3();
+    void LoadLevel4();
+    void CheckLevelCompletion();
+
+    //--------------------------------------------------
     // Shutdown
-    //
-    // Releases resources and prepares the
-    // game for application termination.
     //--------------------------------------------------
 
     void Shutdown();
 
     //--------------------------------------------------
-    // Accessors
-    //
-    // Provides controlled access to
-    // internal game systems.
-    //
-    // Useful for:
-    //
-    //      • Debugging
-    //      • Future UI systems
-    //      • Level management
-    //      • Boss systems
+    // Accessors (Single set - remove duplicates)
     //--------------------------------------------------
-
-    Tank& GetPlayer();
-
-    std::vector<Enemy>&
-        GetEnemies();
-
-    std::vector<Bullet>&
-        GetBullets();
-
-    Map& GetMap();
-
-    Renderer& GetRenderer();
-
-    void LoadLevel2();
-    void LoadLevel3();
+    Tank& GetPlayer() { return player; }
+    std::vector<Enemy>& GetEnemies() { return enemies; }
+    std::vector<Bullet>& GetBullets() { return bullets; }
+    Map& GetMap() { return map; }
+    Renderer& GetRenderer() { return renderer; }
 };
 
 #endif
